@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>THRESHOLD — see who an algorithm gets wrong</title>
+<style>
+  :root{
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    --bg:#04060c;
+    --ink:#f4f7ff;
+    --mut:#8491a3;
+    --dim:#525f76;
+    --line:#1b2230;
+    --blue:#5b9bff;
+    --blue-dim:#1a2c52;
+    --grey:#4a5466;
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font:400 16px/1.55 "Helvetica Neue",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:40px 22px 72px}
+
+  h1{
+    font-weight:700;letter-spacing:-.025em;line-height:.98;
+    font-size:clamp(38px,9vw,64px);margin:0;
+  }
+  .sub{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:12px;letter-spacing:.22em;color:var(--mut);
+    margin:16px 0 0;
+  }
+  .rule{height:2px;background:var(--blue-dim);width:190px;margin:26px 0 0}
+  .lede{color:var(--mut);max-width:60ch;margin:26px 0 0;font-size:15px}
+
+  section{margin-top:44px}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  .scene{width:100%;height:auto;display:block;margin:0 0 6px;overflow:visible}
+
+  .readout{
+    display:flex;justify-content:space-between;align-items:baseline;
+    gap:14px;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:12px;letter-spacing:.14em;color:var(--dim);
+  }
+  .readout b{color:var(--ink);font-weight:400}
+
+  .verdict{
+    margin:34px 0 0;font-size:clamp(21px,4.6vw,29px);
+    font-weight:700;letter-spacing:-.015em;line-height:1.22;
+  }
+  .verdict em{font-style:normal;color:var(--blue)}
+
+  .grid{
+    margin:30px 0 0;display:grid;gap:2px;
+    grid-template-columns:repeat(2,1fr);background:var(--line);
+    border:2px solid var(--line);
+  }
+  .cell{background:var(--bg);padding:17px 16px}
+  .cell .n{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:clamp(23px,5.4vw,31px);display:block;line-height:1.1;
+  }
+  .cell .k{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:.17em;color:var(--dim);
+    display:block;margin-top:9px;
+  }
+  .cell.hit .n{color:var(--blue)}
+  .cell.cost .n{color:var(--ink)}
+  .cell.quiet .n{color:var(--grey)}
+
+  .controls{margin-top:40px;border-top:2px solid var(--line);padding-top:8px}
+  .ctl{padding:19px 0;border-bottom:1px solid var(--line)}
+  .ctl:last-child{border-bottom:0}
+  .ctl-head{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:12px;letter-spacing:.15em;color:var(--mut);
+  }
+  .ctl-head .v{color:var(--ink)}
+  .ctl-note{font-size:13px;color:var(--dim);margin:7px 0 0;max-width:56ch}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;margin:10px 0 0;
+    background:transparent;height:44px;display:block;
+    touch-action:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line)}
+  input[type=range]::-moz-range-track{height:2px;background:var(--line)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--blue);margin-top:-11px;cursor:pointer;border:0;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%;background:var(--blue);
+    cursor:pointer;border:0;
+  }
+  input[type=range]:focus-visible{outline:2px solid var(--blue);outline-offset:6px}
+
+  .presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .presets button{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:.14em;color:var(--mut);
+    background:transparent;border:1px solid var(--line);
+    padding:10px 13px;cursor:pointer;
+  }
+  .presets button:hover,.presets button:focus-visible{
+    color:var(--ink);border-color:var(--blue);outline:none;
+  }
+  .presets button[aria-pressed=true]{color:var(--blue);border-color:var(--blue)}
+
+  footer{
+    margin-top:56px;padding-top:24px;border-top:2px solid var(--line);
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:.16em;color:var(--dim);
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  }
+  footer a{color:var(--mut);text-decoration:none;border-bottom:1px solid var(--line)}
+  footer a:hover{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Threshold</h1>
+  <p class="sub">SEE WHO AN ALGORITHM GETS WRONG</p>
+  <div class="rule"></div>
+  <p class="lede">
+    Every approval system scores you, then compares that score against a line a
+    person chose. Move the line and watch who pays for it.
+  </p>
+
+  <section aria-label="Distribution of scores">
+    <svg class="scene" viewBox="0 0 720 260" role="img"
+         aria-label="Two overlapping score distributions split by a threshold line">
+      <path id="pOv" fill="#16243f"></path>
+      <path id="pNo" fill="none" stroke="#4a5466" stroke-width="2.5"></path>
+      <path id="pYes" fill="none" stroke="#2f5fa8" stroke-width="2.5"></path>
+      <line x1="20" y1="222" x2="700" y2="222" stroke="#1b2230" stroke-width="2"></line>
+      <line id="lThr" y1="40" y2="222" stroke="#f4f7ff" stroke-width="2.5"></line>
+      <text id="tNo" y="34" fill="#6d788c" font-size="11"
+            font-family="ui-monospace,Menlo,monospace" letter-spacing="2.2">CLEAN</text>
+      <text id="tYes" y="34" fill="#5b9bff" font-size="11"
+            font-family="ui-monospace,Menlo,monospace" letter-spacing="2.2">REAL</text>
+    </svg>
+    <div class="readout">
+      <span>DECLINED</span>
+      <span><b id="rThr">0.50</b></span>
+      <span>APPROVED</span>
+    </div>
+  </section>
+
+  <p class="verdict" id="verdict"></p>
+
+  <div class="grid">
+    <div class="cell hit">
+      <span class="n mono" id="nTp">—</span>
+      <span class="k">CAUGHT CORRECTLY</span>
+    </div>
+    <div class="cell cost">
+      <span class="n mono" id="nFp">—</span>
+      <span class="k">FLAGGED, DID NOTHING</span>
+    </div>
+    <div class="cell cost">
+      <span class="n mono" id="nFn">—</span>
+      <span class="k">MISSED ENTIRELY</span>
+    </div>
+    <div class="cell quiet">
+      <span class="n mono" id="nTn">—</span>
+      <span class="k">PASSED CORRECTLY</span>
+    </div>
+  </div>
+
+  <div class="presets" role="group" aria-label="Example systems">
+    <button type="button" data-p="fraud">CARD FRAUD</button>
+    <button type="button" data-p="hiring">RESUME SCREEN</button>
+    <button type="button" data-p="screening">DISEASE SCREEN</button>
+    <button type="button" data-p="moderation">CONTENT FLAGS</button>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label class="ctl-head" for="sThr">
+        <span>WHERE THE LINE SITS</span><span class="v" id="vThr"></span>
+      </label>
+      <input type="range" id="sThr" min="-1" max="4" step="0.02" value="2.33">
+      <p class="ctl-note">
+        Nothing in training produces this number. Somebody picks it, and can move
+        it again next quarter.
+      </p>
+    </div>
+
+    <div class="ctl">
+      <label class="ctl-head" for="sSep">
+        <span>HOW GOOD THE MODEL IS</span><span class="v" id="vSep"></span>
+      </label>
+      <input type="range" id="sSep" min="0.4" max="6" step="0.05" value="4.65">
+      <p class="ctl-note">
+        How far apart the two groups sit on the score. Real systems rarely separate
+        them cleanly, and the overlap is where every error lives.
+      </p>
+    </div>
+
+    <div class="ctl">
+      <label class="ctl-head" for="sBase">
+        <span>HOW COMMON THE THING IS</span><span class="v" id="vBase"></span>
+      </label>
+      <input type="range" id="sBase" min="-4" max="-0.3" step="0.01" value="-3">
+      <p class="ctl-note">
+        The one nobody accounts for. Hunt something rare with an imperfect net and
+        most of what you catch is the wrong thing.
+      </p>
+    </div>
+
+    <div class="ctl">
+      <label class="ctl-head" for="sPop">
+        <span>HOW MANY PEOPLE GO THROUGH</span><span class="v" id="vPop"></span>
+      </label>
+      <input type="range" id="sPop" min="3" max="7" step="0.01" value="5">
+      <p class="ctl-note">Cases the system decides in the period you care about.</p>
+    </div>
+  </div>
+
+  <footer>
+    <span>THE MATH BEHIND AI</span>
+    <span><a href="https://x.com/gleX999">@gleX999</a></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var E = function(id){ return document.getElementById(id); };
+
+  // Abramowitz & Stegun 7.1.26 error function, good to ~1e-7
+  function erf(x){
+    var s = x < 0 ? -1 : 1, a = Math.abs(x);
+    var t = 1/(1+0.3275911*a);
+    var y = 1 - (((((1.061405429*t - 1.453152027)*t) + 1.421413741)*t
+              - 0.284496736)*t + 0.254829592)*t*Math.exp(-a*a);
+    return s*y;
+  }
+  function phi(z){ return 0.5*(1+erf(z/Math.SQRT2)); }   // CDF
+  function pdf(z){ return Math.exp(-0.5*z*z)/Math.sqrt(2*Math.PI); }
+
+  function fmt(n){
+    n = Math.round(n);
+    return n.toLocaleString('en-US');
+  }
+  function pct(x){
+    if(x >= 0.1) return (x*100).toFixed(x*100 >= 10 ? 0 : 1) + '%';
+    if(x >= 0.001) return (x*100).toFixed(2) + '%';
+    return (x*100).toFixed(3) + '%';
+  }
+
+  var S = { thr:2.33, sep:4.65, base:-3, pop:5 };
+
+  var PRESETS = {
+    fraud:      { thr:2.33, sep:4.65, base:-3,    pop:5    },
+    hiring:     { thr:1.00, sep:1.20, base:-1.1,  pop:3.48 },
+    screening:  { thr:1.80, sep:3.50, base:-2.3,  pop:5    },
+    moderation: { thr:1.50, sep:2.20, base:-2,    pop:6    }
+  };
+
+  function draw(sep, thr){
+    var W = 720, X0 = 30, X1 = 690, BASE = 222, H = 165;
+    var lo = -3.4, hi = Math.max(4.2, sep + 3.4);
+    var span = hi - lo;
+    var xOf = function(z){ return X0 + (z - lo)/span * (X1 - X0); };
+    var yOf = function(d){ return BASE - d/0.4 * H; };
+
+    var no = [], yes = [], ov = [];
+    for(var i = 0; i <= 260; i++){
+      var z = lo + span*i/260;
+      var a = pdf(z), b = pdf(z - sep);
+      no.push(xOf(z) + ',' + yOf(a));
+      yes.push(xOf(z) + ',' + yOf(b));
+      ov.push(xOf(z) + ',' + yOf(Math.min(a,b)));
+    }
+    E('pNo').setAttribute('d', 'M' + no.join('L'));
+    E('pYes').setAttribute('d', 'M' + yes.join('L'));
+    E('pOv').setAttribute('d', 'M' + ov.join('L') + 'L' + xOf(hi) + ',' + BASE
+                               + 'L' + xOf(lo) + ',' + BASE + 'Z');
+
+    var tx = Math.max(X0, Math.min(X1, xOf(thr)));
+    E('lThr').setAttribute('x1', tx);
+    E('lThr').setAttribute('x2', tx);
+    E('tNo').setAttribute('x', Math.max(24, xOf(0) - 22));
+    E('tYes').setAttribute('x', xOf(sep) - 16);
+  }
+
+  function render(){
+    var thr = S.thr, sep = S.sep;
+    var base = Math.pow(10, S.base);
+    var pop  = Math.pow(10, S.pop);
+
+    var tpr = 1 - phi(thr - sep);        // caught, of the real ones
+    var fpr = 1 - phi(thr);              // falsely flagged, of the clean ones
+
+    var real  = pop * base;
+    var clean = pop - real;
+    var tp = real * tpr, fn = real - tp;
+    var fp = clean * fpr, tn = clean - fp;
+    var flagged = tp + fp;
+    var prec = flagged > 0 ? tp/flagged : 0;
+
+    draw(sep, thr);
+    E('rThr').textContent = phi(thr).toFixed(2);
+    E('vThr').textContent = phi(thr).toFixed(2);
+    E('vSep').textContent = sep.toFixed(1) + ' SD APART';
+    E('vBase').textContent = pct(base) + ' OF PEOPLE';
+    E('vPop').textContent = fmt(pop) + ' CASES';
+
+    E('nTp').textContent = fmt(tp);
+    E('nFp').textContent = fmt(fp);
+    E('nFn').textContent = fmt(fn);
+    E('nTn').textContent = fmt(tn);
+
+    var v = E('verdict'), wrong = 1 - prec;
+    if(flagged < 0.5){
+      v.innerHTML = 'The line is set so high that this system flags '
+                  + '<em>nobody at all</em>, and quietly misses every real case.';
+    } else if(prec >= 0.5){
+      v.innerHTML = 'Of every 100 people this system flags, <em>'
+                  + Math.round(wrong*100) + ' did nothing wrong</em>. It also misses '
+                  + fmt(fn) + ' real ones.';
+    } else {
+      v.innerHTML = 'Of every 100 people this system flags, <em>'
+                  + Math.round(wrong*100) + ' did nothing wrong</em>. '
+                  + 'It catches ' + pct(tpr) + ' of the real ones, and nothing about '
+                  + 'that trade is a technical fact.';
+    }
+  }
+
+  [['sThr','thr'],['sSep','sep'],['sBase','base'],['sPop','pop']].forEach(function(p){
+    E(p[0]).addEventListener('input', function(){
+      S[p[1]] = parseFloat(this.value);
+      document.querySelectorAll('.presets button').forEach(function(b){
+        b.setAttribute('aria-pressed','false');
+      });
+      render();
+    });
+  });
+
+  document.querySelectorAll('.presets button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var p = PRESETS[btn.dataset.p];
+      S.thr = p.thr; S.sep = p.sep; S.base = p.base; S.pop = p.pop;
+      E('sThr').value = p.thr; E('sSep').value = p.sep;
+      E('sBase').value = p.base; E('sPop').value = p.pop;
+      document.querySelectorAll('.presets button').forEach(function(b){
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      render();
+    });
+  });
+
+  document.querySelector('.presets button').click();
+})();
+</script>
+</body>
+</html>
