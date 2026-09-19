@@ -50,9 +50,7 @@ thing.
 None. Python 3.8 or newer, standard library only.
 
 ```bash
-git clone https://github.com/USER/threshold
-cd threshold
-python3 threshold.py
+git clone https://github.com/gleX999/threshold
 ```
 
 ## Use
@@ -123,7 +121,7 @@ rates you supply and does arithmetic.
 
 ## Longer write-up
 
-[The Five Equations That Quietly Run Every Algorithm That Judges You](https://x.com/gleX999)
+[The Five Equations That Quietly Run Every Algorithm That Judges You](https://x.com/glex999/status/2101312586553733450?s=46)
 
 ## License
 
